@@ -67,18 +67,23 @@ export class ShaderTransition {
         return this;
     }
 
-    public toTexture(to: TextureInfo) {
-        this.texture2 = to;
+    public toTexture(to: TextureInfo, reverse = false) {
+        if (reverse) {
+            this.texture2 = this.texture1;
+            this.texture1 = to;
+        } else {
+            this.texture2 = to;
+        }
         return new Promise((resolve: (value?: unknown) => void) => {
             this.updateUniforms();
-            this.render(0);
+            this.render(reverse?1:0);
             const duration = 1000;
             const startTime = Date.now();
             let progress = 0.0;
             this.stopFrame = false;
 
             const frame = () => {
-                this.render(progress);
+                this.render(reverse ? 1 - progress : progress);
                 const timeProgress = (Date.now() - startTime) / duration;
                 progress = easeOutSine(timeProgress);
                 if (timeProgress <= 1) {
@@ -268,7 +273,8 @@ export class ShaderTransitionArray extends ShaderTransition {
         }
 
         this.texture1 = this.textures[old];
-        await this.toTexture(this.textures[this.active]);
+        await this.toTexture(this.textures[this.active], old > this.active);
+
         return this.active;
     }
 
