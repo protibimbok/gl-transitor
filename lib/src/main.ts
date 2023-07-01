@@ -204,6 +204,9 @@ export class ShaderTransitionArray extends ShaderTransition {
     protected textures: WebGLTexture[] = [];
 
     protected active = 0;
+
+    protected disposed = false;
+
     public static init(
         canvas: string | HTMLCanvasElement,
         images: HTMLImageElement[]
@@ -218,6 +221,9 @@ export class ShaderTransitionArray extends ShaderTransition {
 
         images.forEach((img, i) => {
             instance.loadTexture(img.src).then((texture) => {
+                if (instance.disposed) {
+                    return;
+                }
                 instance.textures[i] = texture;
                 if (i === 0 ) {
                     instance.stop();
@@ -246,5 +252,11 @@ export class ShaderTransitionArray extends ShaderTransition {
 
     public prev(): Promise<unknown> {
         return this.toIndex(this.active - 1);
+    }
+
+    public dispose() {
+        this.stop();
+        this.textures = [];
+        this.disposed = true;
     }
 }

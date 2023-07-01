@@ -22,7 +22,7 @@ export default function Carousel({ slides }: CarouselProps) {
         }
         return () => {
             if (slider.current) {
-                slider.current.stop();
+                slider.current.dispose();
             }
         };
     }, []);
