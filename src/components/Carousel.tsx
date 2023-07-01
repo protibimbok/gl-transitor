@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { classNames } from '../utils/ui';
-import { ShaderTransition } from '../../lib/src/main';
+import { ShaderTransitionArray } from '../../lib/src/main';
 
 interface CarouselProps {
     slides: {
@@ -12,19 +12,13 @@ interface CarouselProps {
 
 export default function Carousel({ slides }: CarouselProps) {
     const [active, setActive] = useState(0);
-    const slider = useRef<ShaderTransition>();
+    const slider = useRef<ShaderTransitionArray>();
     const canvas = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
         if (canvas.current) {
-            slider.current = ShaderTransition.withCanvas(canvas.current);
-            const from = canvas.current?.parentElement?.querySelector(
-                `img[data-idx="0"]`
-            ) as HTMLImageElement;
-            from.onload = () => {
-                slider.current?.from(from).to(from);
-                from.onload = null;
-            }
+            //@ts-expect-error why?
+            slider.current = ShaderTransitionArray.init(canvas.current, canvas.current.nextElementSibling?.querySelectorAll('img'));
         }
         return () => {
             if (slider.current) {
@@ -37,23 +31,7 @@ export default function Carousel({ slides }: CarouselProps) {
         if (next === active || !slider.current) {
             return;
         }
-
-        next = next % slides.length;
-        if (next < 0) {
-            next += slides.length;
-        }
-
-        const from = canvas.current?.parentElement?.querySelector(
-            `img[data-idx="${active}"]`
-        );
-        const to = canvas.current?.parentElement?.querySelector(
-            `img[data-idx="${next}"]`
-        );
-        if (!from || !to) {
-            return;
-        }
-        slider.current.from(from as HTMLImageElement);
-        slider.current.to(to as HTMLImageElement).then(() => setActive(next));
+        slider.current.toIndex(next).then(() => setActive(next));
     };
 
     return (

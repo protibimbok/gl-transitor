@@ -5,26 +5,26 @@ const VERTICES = new Float32Array([-1, -1, -1, 1, 1, 1, -1, -1, 1, 1, 1, -1]);
 
 export class ShaderTransition {
     //@ts-expect-error idk
-    private gl: WebGLRenderingContext;
+    protected gl: WebGLRenderingContext;
     //@ts-expect-error idk
-    private program: WebGLProgram;
+    protected program: WebGLProgram;
 
     //@ts-expect-error idk
-    private texture1: WebGLTexture;
+    protected texture1: WebGLTexture;
     //@ts-expect-error idk
-    private texture2: WebGLTexture;
+    protected texture2: WebGLTexture;
     //@ts-expect-error idk
-    private fromEl: HTMLImageElement;
+    protected fromEl: HTMLImageElement;
     //@ts-expect-error idk
-    private canvas: HTMLCanvasElement;
+    protected canvas: HTMLCanvasElement;
 
-    private stopFrame = false;
+    protected stopFrame = false;
 
-
-    public static withCanvas(canvas: string | HTMLCanvasElement): ShaderTransition {
+    public static withCanvas(
+        canvas: string | HTMLCanvasElement
+    ): ShaderTransition {
         return new ShaderTransition().setCanvas(canvas);
     }
-
 
     public setCanvas(canvas: string | HTMLCanvasElement): ShaderTransition {
         if (typeof canvas === 'string') {
@@ -54,23 +54,20 @@ export class ShaderTransition {
         }
 
         this.fromEl = from;
-        
+        this.texture1 = this.imageToTexture(this.fromEl);
+
         const rect = this.fromEl.getBoundingClientRect();
         this.canvas.height = rect.height;
         this.canvas.width = rect.width;
         this.canvas.style.height = rect.height + 'px';
         this.canvas.style.width = rect.width + 'px';
-        
+
         return this;
     }
 
-    public to(image: string | HTMLImageElement) {
-        if (!this.fromEl) {
-            throw new Error('[shader-animation]: No initial image is given!');
-        }
-
+    public toTexture(to: WebGLTexture) {
+        this.texture2 = to;
         return new Promise((resolve: (value?: unknown) => void) => {
-            this.texture1 = this.imageToTexture(this.fromEl);
             this.gl.viewport(
                 0,
                 0,
@@ -79,7 +76,7 @@ export class ShaderTransition {
             );
             this.render(0);
             const duration = 1000;
-            let startTime: number;
+            const startTime = Date.now();
             let progress = 0.0;
             this.stopFrame = false;
 
@@ -95,19 +92,22 @@ export class ShaderTransition {
                     resolve();
                 }
             };
-
-            if (typeof image === 'string') {
-                this.loadTexture(image).then((res) => {
-                    this.texture2 = res;
-                    startTime = Date.now();
-                    frame();
-                });
-            } else {
-                this.texture2 = this.imageToTexture(image);
-                startTime = Date.now();
-                frame();
-            }
+            frame();
         });
+    }
+
+    public to(image: string | HTMLImageElement) {
+        if (!this.fromEl) {
+            throw new Error('[shader-animation]: No initial image is given!');
+        }
+        if (typeof image === 'string') {
+            return new Promise((resolve) => {
+                this.loadTexture(image).then((res) => {
+                    this.toTexture(res).then(resolve);
+                });
+            });
+        }
+        return this.toTexture(this.imageToTexture(image));
     }
 
     public stop(): ShaderTransition {
@@ -115,9 +115,9 @@ export class ShaderTransition {
         return this;
     }
 
-    private initProgram() {
+    protected initProgram() {
         if (!this.gl) {
-            throw new Error("[shader-animation]: No canvas is provided!");
+            throw new Error('[shader-animation]: No canvas is provided!');
         }
         const gl = this.gl;
         const vertexBuffer = gl.createBuffer();
@@ -142,9 +142,10 @@ export class ShaderTransition {
         gl.linkProgram(program);
 
         gl.useProgram(program);
+        
     }
 
-    private render(progress: number) {
+    protected render(progress: number) {
         const gl = this.gl;
         const positionLocation = gl.getAttribLocation(this.program, 'position');
         gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
@@ -169,16 +170,17 @@ export class ShaderTransition {
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
-    private loadTexture(image: string): Promise<WebGLTexture> {
+    protected loadTexture(image: string): Promise<WebGLTexture> {
         return new Promise((resolve) => {
-            this.fromEl.src = image;
-            this.fromEl.onload = () => {
-                resolve(this.imageToTexture(this.fromEl));
+            const img = new Image();
+            img.src = image;
+            img.onload = () => {
+                resolve(this.imageToTexture(img));
             };
         });
     }
 
-    private imageToTexture(image: HTMLImageElement): WebGLTexture {
+    protected imageToTexture(image: HTMLImageElement): WebGLTexture {
         const gl = this.gl;
         const texture = gl.createTexture() as WebGLTexture;
         gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -195,5 +197,54 @@ export class ShaderTransition {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         return texture;
+    }
+}
+
+export class ShaderTransitionArray extends ShaderTransition {
+    protected textures: WebGLTexture[] = [];
+
+    protected active = 0;
+    public static init(
+        canvas: string | HTMLCanvasElement,
+        images: HTMLImageElement[]
+    ): ShaderTransitionArray {
+        const instance = new ShaderTransitionArray();
+        instance.setCanvas(canvas);
+
+        instance.textures = Array(images.length);
+        const rect = instance.canvas.getBoundingClientRect();
+        instance.canvas.height = rect.height;
+        instance.canvas.width = rect.width;
+
+        images.forEach((img, i) => {
+            instance.loadTexture(img.src).then((texture) => {
+                instance.textures[i] = texture;
+                if (i === 0 ) {
+                    instance.stop();
+                    instance.toIndex(0);
+                }
+            });
+        });
+
+        return instance;
+    }
+
+    public toIndex(to: number): Promise<unknown> {
+        const old = this.active;
+        this.active = to % this.textures.length;
+        if (this.active < 0) {
+            this.active += this.textures.length;
+        }
+
+        this.texture1 = this.textures[old];
+        return this.toTexture(this.textures[this.active]);
+    }
+
+    public next(): Promise<unknown> {
+        return this.toIndex(this.active + 1);
+    }
+
+    public prev(): Promise<unknown> {
+        return this.toIndex(this.active - 1);
     }
 }
