@@ -16,11 +16,15 @@ export default function Carousel({ slides }: CarouselProps) {
     const canvas = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
-        console.log('Effect: []');
         if (canvas.current) {
             slider.current = ShaderTransition.withCanvas(canvas.current);
-        } else {
-            console.warn('Effect[] without canvas');
+            const from = canvas.current?.parentElement?.querySelector(
+                `img[data-idx="0"]`
+            ) as HTMLImageElement;
+            from.onload = () => {
+                slider.current?.from(from).to(from);
+                from.onload = null;
+            }
         }
         return () => {
             if (slider.current) {
@@ -49,23 +53,16 @@ export default function Carousel({ slides }: CarouselProps) {
             return;
         }
         slider.current.from(from as HTMLImageElement);
-        canvas.current?.nextElementSibling?.classList.add('invisible');
-        canvas.current?.classList.remove('hidden');
         slider.current.to(to as HTMLImageElement).then(() => setActive(next));
     };
-
-    useEffect(() => {
-        canvas.current?.nextElementSibling?.classList.remove('invisible');
-        canvas.current?.classList.add('hidden');
-    }, [active]);
 
     return (
         <div className="relative w-full rounded overflow-hidden">
             <canvas
-                className="absolute inset-0 h-full w-full hidden"
+                className="absolute inset-0 h-full w-full"
                 ref={canvas}
             ></canvas>
-            <div className="relative pt-[50%] overflow-hidden">
+            <div className="relative pt-[50%] overflow-hidden invisible">
                 {slides.map((slide, idx) => (
                     <div className="absolute inset-0 h-full w-full" key={idx}>
                         <img
@@ -97,7 +94,7 @@ export default function Carousel({ slides }: CarouselProps) {
             <button
                 type="button"
                 className="absolute top-0 left-0 z-30 flex items-center justify-center h-full px-4 cursor-pointer group focus:outline-none"
-                onClick={()=>change(active - 1)}
+                onClick={() => change(active - 1)}
             >
                 <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/30/30 group-hover:bg-white/50/60 group-focus:ring-4 group-focus:ring-white/70 group-focus:outline-none">
                     <svg
@@ -121,7 +118,7 @@ export default function Carousel({ slides }: CarouselProps) {
             <button
                 type="button"
                 className="absolute top-0 right-0 z-30 flex items-center justify-center h-full px-4 cursor-pointer group focus:outline-none"
-                onClick={()=>change(active + 1)}
+                onClick={() => change(active + 1)}
             >
                 <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/30/30 group-hover:bg-white/50/60 group-focus:ring-4 group-focus:ring-white/70 group-focus:outline-none">
                     <svg
