@@ -31,7 +31,7 @@ export default function Carousel({ slides }: CarouselProps) {
         if (next === active || !slider.current) {
             return;
         }
-        slider.current.toIndex(next).then(() => setActive(next));
+        slider.current.toIndex(next).then((active) => setActive(active));
     };
 
     return (

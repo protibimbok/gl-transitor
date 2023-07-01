@@ -260,7 +260,7 @@ export class ShaderTransitionArray extends ShaderTransition {
         return instance;
     }
 
-    public toIndex(to: number): Promise<unknown> {
+    public async toIndex(to: number): Promise<number> {
         const old = this.active;
         this.active = to % this.textures.length;
         if (this.active < 0) {
@@ -268,14 +268,15 @@ export class ShaderTransitionArray extends ShaderTransition {
         }
 
         this.texture1 = this.textures[old];
-        return this.toTexture(this.textures[this.active]);
+        await this.toTexture(this.textures[this.active]);
+        return this.active;
     }
 
-    public next(): Promise<unknown> {
+    public next(): Promise<number> {
         return this.toIndex(this.active + 1);
     }
 
-    public prev(): Promise<unknown> {
+    public prev(): Promise<number> {
         return this.toIndex(this.active - 1);
     }
 
