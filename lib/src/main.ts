@@ -273,7 +273,7 @@ export class ShaderTransitionArray extends ShaderTransition {
         }
 
         this.texture1 = this.textures[old];
-        await this.toTexture(this.textures[this.active], old > this.active);
+        await this.toTexture(this.textures[this.active], old > to);
 
         return this.active;
     }
