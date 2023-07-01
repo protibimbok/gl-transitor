@@ -2,6 +2,11 @@ import { easeOutSine } from './ease';
 import { fragment, vertex } from './shaders/gooey';
 
 const VERTICES = new Float32Array([-1, -1, -1, 1, 1, 1, -1, -1, 1, 1, 1, -1]);
+interface TextureInfo {
+    texture: WebGLTexture;
+    height: number;
+    width: number;
+}
 
 export class ShaderTransition {
     //@ts-expect-error idk
@@ -10,11 +15,9 @@ export class ShaderTransition {
     protected program: WebGLProgram;
 
     //@ts-expect-error idk
-    protected texture1: WebGLTexture;
+    protected texture1: TextureInfo;
     //@ts-expect-error idk
-    protected texture2: WebGLTexture;
-    //@ts-expect-error idk
-    protected fromEl: HTMLImageElement;
+    protected texture2: TextureInfo;
     //@ts-expect-error idk
     protected canvas: HTMLCanvasElement;
 
@@ -53,10 +56,9 @@ export class ShaderTransition {
             );
         }
 
-        this.fromEl = from;
-        this.texture1 = this.imageToTexture(this.fromEl);
+        this.texture1 = this.imageToTexture(from);
 
-        const rect = this.fromEl.getBoundingClientRect();
+        const rect = from.getBoundingClientRect();
         this.canvas.height = rect.height;
         this.canvas.width = rect.width;
         this.canvas.style.height = rect.height + 'px';
@@ -65,15 +67,10 @@ export class ShaderTransition {
         return this;
     }
 
-    public toTexture(to: WebGLTexture) {
+    public toTexture(to: TextureInfo) {
         this.texture2 = to;
         return new Promise((resolve: (value?: unknown) => void) => {
-            this.gl.viewport(
-                0,
-                0,
-                this.gl.drawingBufferWidth,
-                this.gl.drawingBufferHeight
-            );
+            this.updateUniforms();
             this.render(0);
             const duration = 1000;
             const startTime = Date.now();
@@ -97,7 +94,7 @@ export class ShaderTransition {
     }
 
     public to(image: string | HTMLImageElement) {
-        if (!this.fromEl) {
+        if (!this.texture1) {
             throw new Error('[shader-animation]: No initial image is given!');
         }
         if (typeof image === 'string') {
@@ -141,28 +138,43 @@ export class ShaderTransition {
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
 
+        // console.log(gl.getShaderInfoLog(fragmentShader));
+
         gl.useProgram(program);
-        
     }
 
-    protected render(progress: number) {
+    protected updateUniforms() {
         const gl = this.gl;
+        gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
         const positionLocation = gl.getAttribLocation(this.program, 'position');
         gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(positionLocation);
 
         const texture1L = gl.getUniformLocation(this.program, 'texture1');
-        const texture2L = gl.getUniformLocation(this.program, 'texture2');
-        const progressL = gl.getUniformLocation(this.program, 'progress');
         gl.uniform1i(texture1L, 0); // Texture unit 0
-        gl.uniform1i(texture2L, 1); // Texture unit 1
-        gl.uniform1f(progressL, progress);
-
-        // Bind the textures to the respective texture units
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.texture1);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture1.texture);
+
+        const size1L = gl.getUniformLocation(this.program, 'size1');
+        gl.uniform2f(size1L, this.texture1.width, this.texture1.height);
+
+        const texture2L = gl.getUniformLocation(this.program, 'texture2');
+        gl.uniform1i(texture2L, 1); // Texture unit 1
         gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, this.texture2);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture2.texture);
+
+        const size2L = gl.getUniformLocation(this.program, 'size2');
+        gl.uniform2f(size2L, this.texture2.width, this.texture2.height);
+
+        const resolutionL = gl.getUniformLocation(this.program, 'resolution');
+        gl.uniform2f(resolutionL, this.canvas.width, this.canvas.height);
+    }
+
+    protected render(progress: number) {
+        const gl = this.gl;
+
+        const progressL = gl.getUniformLocation(this.program, 'progress');
+        gl.uniform1f(progressL, progress);
 
         // Draw our 3 VERTICES as 1 triangle
         gl.clearColor(1.0, 1.0, 1.0, 1.0);
@@ -170,7 +182,7 @@ export class ShaderTransition {
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
-    protected loadTexture(image: string): Promise<WebGLTexture> {
+    protected loadTexture(image: string): Promise<TextureInfo> {
         return new Promise((resolve) => {
             const img = new Image();
             img.src = image;
@@ -180,7 +192,7 @@ export class ShaderTransition {
         });
     }
 
-    protected imageToTexture(image: HTMLImageElement): WebGLTexture {
+    protected imageToTexture(image: HTMLImageElement): TextureInfo {
         const gl = this.gl;
         const texture = gl.createTexture() as WebGLTexture;
         gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -196,12 +208,16 @@ export class ShaderTransition {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        return texture;
+        return {
+            texture,
+            height: image.naturalHeight,
+            width: image.naturalWidth,
+        };
     }
 }
 
 export class ShaderTransitionArray extends ShaderTransition {
-    protected textures: WebGLTexture[] = [];
+    protected textures: TextureInfo[] = [];
 
     protected active = 0;
 
@@ -220,16 +236,25 @@ export class ShaderTransitionArray extends ShaderTransition {
         instance.canvas.width = rect.width;
 
         images.forEach((img, i) => {
-            instance.loadTexture(img.src).then((texture) => {
+            if (img.complete && img.naturalHeight > 0) {
+                handleImageLoad();
+            } else {
+                img.addEventListener('load', handleImageLoad, { once: true });
+            }
+
+            function handleImageLoad() {
                 if (instance.disposed) {
                     return;
                 }
-                instance.textures[i] = texture;
-                if (i === 0 ) {
+                instance.textures[i] = instance.imageToTexture(img);
+                if (i === 0) {
                     instance.stop();
-                    instance.toIndex(0);
+                    instance.texture1 = instance.textures[0];
+                    instance.texture2 = instance.textures[0];
+                    instance.updateUniforms();
+                    instance.render(1);
                 }
-            });
+            }
         });
 
         return instance;
