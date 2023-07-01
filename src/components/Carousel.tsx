@@ -1,0 +1,147 @@
+import { useEffect, useRef, useState } from 'react';
+import { classNames } from '../utils/ui';
+import { ShaderTransition } from '../../lib/src/main';
+
+interface CarouselProps {
+    slides: {
+        image: string;
+        heading?: string;
+        text?: string;
+    }[];
+}
+
+export default function Carousel({ slides }: CarouselProps) {
+    const [active, setActive] = useState(0);
+    const slider = useRef<ShaderTransition>();
+    const canvas = useRef<HTMLCanvasElement>(null);
+
+    useEffect(() => {
+        console.log('Effect: []');
+        if (canvas.current) {
+            slider.current = ShaderTransition.withCanvas(canvas.current);
+        } else {
+            console.warn('Effect[] without canvas');
+        }
+        return () => {
+            if (slider.current) {
+                slider.current.stop();
+            }
+        };
+    }, []);
+
+    const change = (next: number) => {
+        if (next === active || !slider.current) {
+            return;
+        }
+
+        next = next % slides.length;
+        if (next < 0) {
+            next += slides.length;
+        }
+
+        const from = canvas.current?.parentElement?.querySelector(
+            `img[data-idx="${active}"]`
+        );
+        const to = canvas.current?.parentElement?.querySelector(
+            `img[data-idx="${next}"]`
+        );
+        if (!from || !to) {
+            return;
+        }
+        slider.current.from(from as HTMLImageElement);
+        canvas.current?.nextElementSibling?.classList.add('invisible');
+        canvas.current?.classList.remove('hidden');
+        slider.current.to(to as HTMLImageElement).then(() => setActive(next));
+    };
+
+    useEffect(() => {
+        canvas.current?.nextElementSibling?.classList.remove('invisible');
+        canvas.current?.classList.add('hidden');
+    }, [active]);
+
+    return (
+        <div className="relative w-full rounded overflow-hidden">
+            <canvas
+                className="absolute inset-0 h-full w-full hidden"
+                ref={canvas}
+            ></canvas>
+            <div className="relative pt-[50%] overflow-hidden">
+                {slides.map((slide, idx) => (
+                    <div className="absolute inset-0 h-full w-full" key={idx}>
+                        <img
+                            data-idx={idx}
+                            src={slide.image}
+                            alt=""
+                            className={classNames({
+                                'h-full w-full object-cover object-top': true,
+                                invisible: active !== idx,
+                            })}
+                        />
+                    </div>
+                ))}
+            </div>
+            <div className="w-max left-1/2 -translate-x-1/2 absolute bottom-5 flex justify-center gap-3">
+                {slides.map((_, i) => (
+                    <button
+                        key={i}
+                        type="button"
+                        className={classNames({
+                            'w-3 h-3 rounded-full bg-white ring-4 ring-black hover:ring-blue-300':
+                                true,
+                            'ring-blue-500': active === i,
+                        })}
+                        onClick={() => change(i)}
+                    ></button>
+                ))}
+            </div>
+            <button
+                type="button"
+                className="absolute top-0 left-0 z-30 flex items-center justify-center h-full px-4 cursor-pointer group focus:outline-none"
+                onClick={()=>change(active - 1)}
+            >
+                <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/30/30 group-hover:bg-white/50/60 group-focus:ring-4 group-focus:ring-white/70 group-focus:outline-none">
+                    <svg
+                        aria-hidden="true"
+                        className="w-6 h-6 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M15 19l-7-7 7-7"
+                        ></path>
+                    </svg>
+                    <span className="sr-only">Previous</span>
+                </span>
+            </button>
+            <button
+                type="button"
+                className="absolute top-0 right-0 z-30 flex items-center justify-center h-full px-4 cursor-pointer group focus:outline-none"
+                onClick={()=>change(active + 1)}
+            >
+                <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white/30/30 group-hover:bg-white/50/60 group-focus:ring-4 group-focus:ring-white/70 group-focus:outline-none">
+                    <svg
+                        aria-hidden="true"
+                        className="w-6 h-6 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M9 5l7 7-7 7"
+                        ></path>
+                    </svg>
+                    <span className="sr-only">Next</span>
+                </span>
+            </button>
+        </div>
+    );
+}
