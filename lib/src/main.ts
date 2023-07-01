@@ -142,10 +142,6 @@ export class ShaderTransition {
         gl.linkProgram(program);
 
         gl.useProgram(program);
-        const compilationLog = gl.getShaderInfoLog(fragmentShader);
-        console.log('Shader compiler log: ' + compilationLog);
-        console.log(gl.getError());
-        console.log(gl.getProgramInfoLog(program));
     }
 
     private render(progress: number) {
