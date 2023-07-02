@@ -72,42 +72,25 @@ vec2 getUv2(vec2 uv) {
 export class ShaderTransition {
     protected TEXTURE_CACHE = new Map<string, WebGLTexture>();
 
-    //@ts-expect-error idk
     protected gl: WebGLRenderingContext;
     protected program?: WebGLProgram;
 
-    protected fromImage?: HTMLImageElement;
-    protected toImage?: HTMLImageElement;
-
-    // @ts-expect-error saad
     protected canvas: HTMLCanvasElement;
 
     protected stopFrame = false;
 
     protected currentProgram = 0;
     protected programs: WebGLProgram[];
-    protected effects: string[];
+    /**
+     * Configurations
+     */
+    protected DURATION = 1000;
+    protected REVERSE = false;
 
-    constructor(effects: string | string[]) {
-        if (typeof effects === 'string') {
-            this.effects = [effects];
-        } else {
-            if (effects.length === 0) {
-                throw new Error('[shader-animation]: No effect is registered!');
-            }
-            this.effects = effects;
-        }
-        this.programs = Array(this.effects.length);
-    }
-
-    public static withCanvas(
+    constructor(
         canvas: string | HTMLCanvasElement,
         effects: string | string[]
-    ): ShaderTransition {
-        return new ShaderTransition(effects).setCanvas(canvas);
-    }
-
-    public setCanvas(canvas: string | HTMLCanvasElement): ShaderTransition {
+    ) {
         if (typeof canvas === 'string') {
             canvas = document.querySelector(canvas) as HTMLCanvasElement;
         }
@@ -119,58 +102,31 @@ export class ShaderTransition {
         }
         this.canvas = canvas;
         this.gl = canvas.getContext('webgl') as WebGLRenderingContext;
-        this.effects.forEach((effect, i) => {
+
+        if (typeof effects === 'string') {
+            effects = [effects];
+        } else if (effects.length === 0) {
+            throw new Error('[shader-animation]: No effect is registered!');
+        }
+
+        this.programs = Array(effects.length);
+
+        effects.forEach((effect, i) => {
             this.programs[i] = this.initProgram(effect);
         });
+
         this.program = this.programs[0];
         this.gl.useProgram(this.program);
-        this.effects = [];
-        return this;
     }
 
-    public from(from: string | HTMLImageElement): ShaderTransition {
-        // Ensure the from argument is an <img> element
-        if (typeof from === 'string') {
-            from = document.querySelector(from) as HTMLImageElement;
-        }
-        if (!from || from.tagName !== 'IMG') {
-            throw new Error(
-                "[shader-animation]: 'from' argument does not point to an <img> element!"
-            );
-        }
-
-        this.fromImage = from;
-
-        const rect = from.getBoundingClientRect();
-        this.canvas.height = rect.height;
-        this.canvas.width = rect.width;
-        this.canvas.style.height = rect.height + 'px';
-        this.canvas.style.width = rect.width + 'px';
-
-        return this;
+    public static init(
+        canvas: string | HTMLCanvasElement,
+        effects: string | string[]
+    ): ShaderTransition {
+        return new ShaderTransition(canvas, effects);
     }
 
-    public to(to: HTMLImageElement, duration = 1000, reverse = false) {
-        if (!this.fromImage) {
-            throw new Error('[shader-animation]: Invalid from image!');
-        }
-        if (!to.complete || to.naturalHeight === 0) {
-            throw new Error('[shader-animation]: Invalid to image!');
-        }
-        return this.animate(
-            this.imageToTexture(this.fromImage),
-            this.imageToTexture(to),
-            duration,
-            reverse
-        );
-    }
-
-    public animate(
-        from: TextureInfo,
-        to: TextureInfo,
-        duration = 1000,
-        reverse = false
-    ) {
+    public animate(from: TextureInfo, to: TextureInfo) {
         if (this.programs.length > 1) {
             // console.time('Finding Program:');
             this.currentProgram = Math.floor(
@@ -180,21 +136,21 @@ export class ShaderTransition {
             this.gl.useProgram(this.program);
             // console.timeEnd('Finding Program:');
         }
-        if (reverse) {
+        if (this.REVERSE) {
             const tmp = to;
             to = from;
             from = tmp;
         }
         return new Promise((resolve: (value?: unknown) => void) => {
             this.updateUniforms(from, to);
-            this.render(reverse ? 1 : 0);
+            this.render(this.REVERSE ? 1 : 0);
             const startTime = Date.now();
             let progress = 0.0;
             this.stopFrame = false;
 
             const frame = () => {
-                this.render(reverse ? 1 - progress : progress);
-                const timeProgress = (Date.now() - startTime) / duration;
+                this.render(this.REVERSE ? 1 - progress : progress);
+                const timeProgress = (Date.now() - startTime) / this.DURATION;
                 progress = easeOutSine(timeProgress);
                 if (timeProgress <= 1) {
                     if (!this.stopFrame) {
@@ -210,6 +166,16 @@ export class ShaderTransition {
 
     public stop(): ShaderTransition {
         this.stopFrame = true;
+        return this;
+    }
+
+    public setDuration(duration: number): ShaderTransition {
+        this.DURATION = duration;
+        return this;
+    }
+
+    public setReverse(reverse: boolean): ShaderTransition {
+        this.REVERSE = reverse;
         return this;
     }
 
@@ -344,54 +310,53 @@ export class ShaderTransitionArray extends ShaderTransition {
 
     protected disposed = false;
 
-    public static init(
+    public static withImages(
         canvas: string | HTMLCanvasElement,
         effects: string | string[],
         images: HTMLImageElement[]
     ): ShaderTransitionArray {
-        const instance = new ShaderTransitionArray(effects);
-        instance.setCanvas(canvas);
+        const ins = new ShaderTransitionArray(canvas, effects);
+        ins.setImages(images);
+        return ins;
+    }
 
-        instance.textures = Array(images.length);
-        const rect = instance.canvas.getBoundingClientRect();
-        instance.canvas.height = rect.height;
-        instance.canvas.width = rect.width;
+    public setImages(images: HTMLImageElement[]): ShaderTransitionArray {
+        this.textures = Array(images.length);
+        const rect = this.canvas.getBoundingClientRect();
+        this.canvas.height = rect.height;
+        this.canvas.width = rect.width;
 
         images.forEach((img, i) => {
+            const handleImageLoad = () => {
+                if (this.disposed) {
+                    return;
+                }
+                const texture = (this.textures[i] = this.imageToTexture(img));
+                if (i === 0) {
+                    this.stop();
+                    this.updateUniforms(texture, texture);
+                    this.render(0);
+                }
+            };
             if (img.complete && img.naturalHeight > 0) {
                 handleImageLoad();
             } else {
                 img.addEventListener('load', handleImageLoad, { once: true });
             }
-
-            function handleImageLoad() {
-                if (instance.disposed) {
-                    return;
-                }
-                const texture = (instance.textures[i] =
-                    instance.imageToTexture(img));
-                if (i === 0) {
-                    instance.stop();
-                    instance.updateUniforms(texture, texture);
-                    instance.render(0);
-                }
-            }
         });
 
-        return instance;
+        return this;
     }
 
-    public async toIndex(to: number, duration = 1000): Promise<number> {
+    public async toIndex(to: number): Promise<number> {
         const old = this.active;
         this.active = to % this.textures.length;
         if (this.active < 0) {
             this.active += this.textures.length;
         }
-        await this.animate(
+        await this.setReverse(old > to).animate(
             this.textures[old],
-            this.textures[this.active],
-            duration,
-            old > to
+            this.textures[this.active]
         );
 
         return this.active;

@@ -18,7 +18,7 @@ export default function Carousel({ slides }: CarouselProps) {
 
     useEffect(() => {
         if (canvas.current) {
-            slider.current = ShaderTransitionArray.init(
+            slider.current = ShaderTransitionArray.withImages(
                 canvas.current,
                 all,
                 //@ts-expect-error why?
