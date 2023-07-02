@@ -1,5 +1,5 @@
 import { easeOutSine } from './ease';
-import { fragment } from './shaders/lay-y';
+import { fragment } from './shaders/fly-eye';
 
 const VERTICES = new Float32Array([-1, -1, -1, 1, 1, 1, -1, -1, 1, 1, 1, -1]);
 interface TextureInfo {
@@ -72,6 +72,20 @@ varying vec2 size2;
 varying vec4 position;
 
 varying vec2 resolution;
+
+vec2 fittedUv(vec2 imageSize, vec2 uv, vec2 resolution) {
+    float tR = imageSize.x / imageSize.y;
+    float vR = resolution.x / resolution.y;
+
+    if (tR > vR) {
+        float scale = (vR * imageSize.y) / imageSize.x;
+        return vec2(uv.x * scale + (1.0 - scale) / 2.0, uv.y);
+    } else {
+        float scale = (imageSize.x / vR) / imageSize.y;
+        return vec2(uv.x, uv.y * scale + (1.0 - scale) / 2.0);
+    }
+}
+
 
 `;
 
@@ -198,19 +212,30 @@ export class ShaderTransition {
         gl.shaderSource(vertexShader, vertex);
         gl.compileShader(vertexShader);
 
+        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+            throw new Error('Shader compilation error:\n' + gl.getShaderInfoLog(vertexShader));
+        }
+
         const fragmentShader = gl.createShader(
             gl.FRAGMENT_SHADER
         ) as WebGLShader;
         gl.shaderSource(fragmentShader, fragmentVars + fragment);
         gl.compileShader(fragmentShader);
 
+        if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+            throw new Error('Shader compilation error:\n' + gl.getShaderInfoLog(fragmentShader));
+        }
+
+
         const program = (this.program = gl.createProgram() as WebGLProgram);
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
 
-        // console.log(gl.getShaderInfoLog(fragmentShader));
-        // console.log(gl.getShaderInfoLog(vertexShader));
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            throw new Error('Shader compilation error:\n' + gl.getProgramInfoLog(program));
+        }
+
 
         gl.useProgram(program);
     }
