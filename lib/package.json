@@ -1,15 +1,37 @@
 {
-  "name": "shader-transitions",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "name": "gl-transitor",
+  "version": "0.0.1-alpha",
+  "description": "A simple package to create complex transitions using webgl.",
+  "keywords": [
+      "animation",
+      "webgl",
+      "transition",
+      "slider",
+      "swiper"
+  ],
+  "homepage": "https://github.com/protibimbok/gl-transitor",
+  "repository": {
+      "type": "git",
+      "url": "https://github.com/protibimbok/gl-transitor"
+  },
+  "license": "MIT",
+  "author": {
+      "name": "Sakibur Rahman Khan",
+      "email": "sakib.saad.khan@gmail.com"
+  },
+  "main": "dist/main.js",
+  "types": "dist/main.d.ts",
+  "files": [
+      "/dist/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+      "build": "rm -rf dist && tsc"
   },
   "devDependencies": {
-    "typescript": "^4.9.3",
-    "vite": "^4.1.0"
+      "@types/node": "^18.11.9",
+      "typescript": "^4.6.4"
+  },
+  "engines": {
+      "node": ">=14"
   }
 }
