@@ -123,6 +123,7 @@ export class ShaderTransition {
             this.programs[i] = this.initProgram(effect);
         });
         this.program = this.programs[0];
+        this.gl.useProgram(this.program);
         this.effects = [];
         return this;
     }
@@ -371,7 +372,8 @@ export class ShaderTransitionArray extends ShaderTransition {
                     instance.imageToTexture(img));
                 if (i === 0) {
                     instance.stop();
-                    instance.animate(texture, texture);
+                    instance.updateUniforms(texture, texture);
+                    instance.render(0);
                 }
             }
         });
