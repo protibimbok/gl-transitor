@@ -123,6 +123,7 @@ export class ShaderTransition {
             this.programs[i] = this.initProgram(effect);
         });
         this.program = this.programs[0];
+        this.effects = [];
         return this;
     }
 
@@ -336,8 +337,7 @@ export class ShaderTransition {
 }
 
 export class ShaderTransitionArray extends ShaderTransition {
-    protected textures = new Map<string, TextureInfo>();
-    protected images: HTMLImageElement[] = [];
+    protected textures: TextureInfo[] = [];
 
     protected active = 0;
 
@@ -351,7 +351,7 @@ export class ShaderTransitionArray extends ShaderTransition {
         const instance = new ShaderTransitionArray(effects);
         instance.setCanvas(canvas);
 
-        instance.images = Array(images.length);
+        instance.textures = Array(images.length);
         const rect = instance.canvas.getBoundingClientRect();
         instance.canvas.height = rect.height;
         instance.canvas.width = rect.width;
@@ -367,10 +367,11 @@ export class ShaderTransitionArray extends ShaderTransition {
                 if (instance.disposed) {
                     return;
                 }
-                instance.images[i] = img;
+                const texture = (instance.textures[i] =
+                    instance.imageToTexture(img));
                 if (i === 0) {
                     instance.stop();
-                    instance.from(img).to(img);
+                    instance.animate(texture, texture);
                 }
             }
         });
@@ -380,25 +381,16 @@ export class ShaderTransitionArray extends ShaderTransition {
 
     public async toIndex(to: number, duration = 1000): Promise<number> {
         const old = this.active;
-        this.active = to % this.images.length;
+        this.active = to % this.textures.length;
         if (this.active < 0) {
-            this.active += this.images.length;
+            this.active += this.textures.length;
         }
-
-        const fKey = `${old}-${this.currentProgram}`;
-        const tKey = `${this.active}-${this.currentProgram}`;
-        let from = this.textures.get(fKey);
-        if (!from) {
-            from = this.imageToTexture(this.images[old]);
-            this.textures.set(fKey, from);
-        }
-        let toTex = this.textures.get(tKey);
-        if (!toTex) {
-            toTex = this.imageToTexture(this.images[this.active]);
-            this.textures.set(tKey, toTex);
-        }
-
-        await this.animate(from, toTex, duration, old > to);
+        await this.animate(
+            this.textures[old],
+            this.textures[this.active],
+            duration,
+            old > to
+        );
 
         return this.active;
     }
@@ -413,8 +405,7 @@ export class ShaderTransitionArray extends ShaderTransition {
 
     public dispose() {
         this.stop();
-        this.images = [];
-        this.textures.clear();
+        this.textures = [];
         this.disposed = true;
     }
 }
