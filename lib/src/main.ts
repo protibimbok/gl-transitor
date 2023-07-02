@@ -1,5 +1,5 @@
 import { easeOutSine } from './ease';
-import { fragment } from './shaders/gooey';
+import { fragment } from './shaders/lay-y';
 
 const VERTICES = new Float32Array([-1, -1, -1, 1, 1, 1, -1, -1, 1, 1, 1, -1]);
 interface TextureInfo {
