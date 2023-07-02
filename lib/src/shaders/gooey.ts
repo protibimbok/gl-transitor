@@ -11,20 +11,10 @@ void main() {
 `;
 
 export const fragment = `
-precision highp float;
-uniform float progress;
-uniform vec2 resolution;
-uniform vec2 size1;
-uniform vec2 size2;
-uniform sampler2D texture1;
-uniform sampler2D texture2;
 
 const float width = 0.5;
 const float scaleX = 40.0;
 const float scaleY = 40.0;
-
-varying vec2 vUv;
-varying vec4 vPosition;
 
 //	Classic Perlin 3D Noise 
 //	by Stefan Gustavson
@@ -171,28 +161,12 @@ float parabola( float x, float k ) {
     return pow( 4. * x * ( 1. - x ), k );
 }
 
-vec2 fitImage(vec2 imageSize, vec2 uv, vec2 resolution) {
-    float tR = imageSize.x / imageSize.y;
-    float vR = resolution.x / resolution.y;
-
-    if (tR > vR) {
-        float scale = (vR * imageSize.y) / imageSize.x;
-        return vec2(uv.x * scale + (1.0 - scale) / 2.0, uv.y);
-    } else {
-        float scale = (imageSize.x / vR) / imageSize.y;
-        return vec2(uv.x, uv.y * scale + (1.0 - scale) / 2.0);
-    }
-}
-
 void main()	{
     float dt = parabola(progress, 1.0);
 
-    vec2 uv = vec2(vUv.x, 1.0 - vUv.y);
 
-    vec4 img1 = texture2D(texture1, fitImage(size1, uv, resolution));
-    vec4 img2 = texture2D(texture2, fitImage(size2, uv, resolution));
-
-    // vec4 mixedImages = mix(img1, img2, step(progress, uv.x));
+    vec4 img1 = texture2D(texture1, uv1);
+    vec4 img2 = texture2D(texture2, uv2);
 
     float realnoise = 0.5*(
         cnoise(
@@ -218,8 +192,6 @@ void main()	{
     );
 
     float maskvalue0 = smoothstep(1.0, 1.0, vUv.x + progress);
-
-
 
     float mask = maskvalue * (1.0 + realnoise);
 

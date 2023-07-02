@@ -1,5 +1,5 @@
 import { easeOutSine } from './ease';
-import { fragment, vertex } from './shaders/gooey';
+import { fragment } from './shaders/gooey';
 
 const VERTICES = new Float32Array([-1, -1, -1, 1, 1, 1, -1, -1, 1, 1, 1, -1]);
 interface TextureInfo {
@@ -7,6 +7,73 @@ interface TextureInfo {
     height: number;
     width: number;
 }
+
+const vertex = `
+precision highp float;
+
+attribute vec2 pos;
+
+uniform vec2 res;
+uniform vec2 tSize1;
+uniform vec2 tSize2;
+
+varying vec2 vUv;
+varying vec2 uv;
+varying vec2 uv1;
+varying vec2 uv2;
+
+varying vec2 size1;
+varying vec2 size2;
+
+varying vec4 position;
+varying vec2 resolution;
+
+vec2 fittedUv(vec2 imageSize, vec2 uv, vec2 resolution) {
+    float tR = imageSize.x / imageSize.y;
+    float vR = resolution.x / resolution.y;
+
+    if (tR > vR) {
+        float scale = (vR * imageSize.y) / imageSize.x;
+        return vec2(uv.x * scale + (1.0 - scale) / 2.0, uv.y);
+    } else {
+        float scale = (imageSize.x / vR) / imageSize.y;
+        return vec2(uv.x, uv.y * scale + (1.0 - scale) / 2.0);
+    }
+}
+
+void main() {
+  vUv = (pos + 1.0) / 2.0;
+  uv = vec2(vUv.x, 1.0 - vUv.y);
+  uv1 = fittedUv(tSize1, uv, res);
+  uv2 = fittedUv(tSize2, uv, res);
+
+  size1 = tSize1;
+  size2 = tSize2;
+
+  resolution = res;
+  position = vec4(pos, 0, 1.0);
+
+  gl_Position = position;
+}
+`;
+
+const fragmentVars = `
+precision highp float;
+uniform float progress;
+uniform sampler2D texture1;
+uniform sampler2D texture2;
+
+varying vec2 vUv;
+varying vec2 uv;
+varying vec2 uv1;
+varying vec2 uv2;
+varying vec2 size1;
+varying vec2 size2;
+varying vec4 position;
+
+varying vec2 resolution;
+
+`;
 
 export class ShaderTransition {
     //@ts-expect-error idk
@@ -67,7 +134,7 @@ export class ShaderTransition {
         return this;
     }
 
-    public toTexture(to: TextureInfo, reverse = false) {
+    public toTexture(to: TextureInfo, duration = 1000, reverse = false) {
         if (reverse) {
             this.texture2 = this.texture1;
             this.texture1 = to;
@@ -77,7 +144,6 @@ export class ShaderTransition {
         return new Promise((resolve: (value?: unknown) => void) => {
             this.updateUniforms();
             this.render(reverse?1:0);
-            const duration = 1000;
             const startTime = Date.now();
             let progress = 0.0;
             this.stopFrame = false;
@@ -98,7 +164,7 @@ export class ShaderTransition {
         });
     }
 
-    public to(image: string | HTMLImageElement) {
+    public to(image: string | HTMLImageElement, duration = 1000, reverse = false) {
         if (!this.texture1) {
             throw new Error('[shader-animation]: No initial image is given!');
         }
@@ -109,7 +175,7 @@ export class ShaderTransition {
                 });
             });
         }
-        return this.toTexture(this.imageToTexture(image));
+        return this.toTexture(this.imageToTexture(image), duration, reverse);
     }
 
     public stop(): ShaderTransition {
@@ -135,7 +201,7 @@ export class ShaderTransition {
         const fragmentShader = gl.createShader(
             gl.FRAGMENT_SHADER
         ) as WebGLShader;
-        gl.shaderSource(fragmentShader, fragment);
+        gl.shaderSource(fragmentShader, fragmentVars + fragment);
         gl.compileShader(fragmentShader);
 
         const program = (this.program = gl.createProgram() as WebGLProgram);
@@ -144,6 +210,7 @@ export class ShaderTransition {
         gl.linkProgram(program);
 
         // console.log(gl.getShaderInfoLog(fragmentShader));
+        // console.log(gl.getShaderInfoLog(vertexShader));
 
         gl.useProgram(program);
     }
@@ -151,7 +218,7 @@ export class ShaderTransition {
     protected updateUniforms() {
         const gl = this.gl;
         gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-        const positionLocation = gl.getAttribLocation(this.program, 'position');
+        const positionLocation = gl.getAttribLocation(this.program, 'pos');
         gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(positionLocation);
 
@@ -160,7 +227,7 @@ export class ShaderTransition {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.texture1.texture);
 
-        const size1L = gl.getUniformLocation(this.program, 'size1');
+        const size1L = gl.getUniformLocation(this.program, 'tSize1');
         gl.uniform2f(size1L, this.texture1.width, this.texture1.height);
 
         const texture2L = gl.getUniformLocation(this.program, 'texture2');
@@ -168,10 +235,10 @@ export class ShaderTransition {
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.texture2.texture);
 
-        const size2L = gl.getUniformLocation(this.program, 'size2');
+        const size2L = gl.getUniformLocation(this.program, 'tSize2');
         gl.uniform2f(size2L, this.texture2.width, this.texture2.height);
 
-        const resolutionL = gl.getUniformLocation(this.program, 'resolution');
+        const resolutionL = gl.getUniformLocation(this.program, 'res');
         gl.uniform2f(resolutionL, this.canvas.width, this.canvas.height);
     }
 
@@ -265,7 +332,7 @@ export class ShaderTransitionArray extends ShaderTransition {
         return instance;
     }
 
-    public async toIndex(to: number): Promise<number> {
+    public async toIndex(to: number, duration = 1000): Promise<number> {
         const old = this.active;
         this.active = to % this.textures.length;
         if (this.active < 0) {
@@ -273,7 +340,7 @@ export class ShaderTransitionArray extends ShaderTransition {
         }
 
         this.texture1 = this.textures[old];
-        await this.toTexture(this.textures[this.active], old > to);
+        await this.toTexture(this.textures[this.active], duration, old > to);
 
         return this.active;
     }
