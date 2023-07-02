@@ -1,5 +1,5 @@
 import { easeOutSine } from './ease';
-import { fragment } from './shaders/fly-eye';
+import { fragment } from './shaders/lay-y';
 
 const VERTICES = new Float32Array([-1, -1, -1, 1, 1, 1, -1, -1, 1, 1, 1, -1]);
 interface TextureInfo {
@@ -14,44 +14,21 @@ precision highp float;
 attribute vec2 pos;
 
 uniform vec2 res;
-uniform vec2 tSize1;
-uniform vec2 tSize2;
 
 varying vec2 vUv;
 varying vec2 uv;
-varying vec2 uv1;
-varying vec2 uv2;
-
-varying vec2 size1;
-varying vec2 size2;
 
 varying vec4 position;
 varying vec2 resolution;
 
-vec2 fittedUv(vec2 imageSize, vec2 uv, vec2 resolution) {
-    float tR = imageSize.x / imageSize.y;
-    float vR = resolution.x / resolution.y;
-
-    if (tR > vR) {
-        float scale = (vR * imageSize.y) / imageSize.x;
-        return vec2(uv.x * scale + (1.0 - scale) / 2.0, uv.y);
-    } else {
-        float scale = (imageSize.x / vR) / imageSize.y;
-        return vec2(uv.x, uv.y * scale + (1.0 - scale) / 2.0);
-    }
-}
 
 void main() {
-  vUv = (pos + 1.0) / 2.0;
-  uv = vec2(vUv.x, 1.0 - vUv.y);
-  uv1 = fittedUv(tSize1, uv, res);
-  uv2 = fittedUv(tSize2, uv, res);
-
-  size1 = tSize1;
-  size2 = tSize2;
-
   resolution = res;
   position = vec4(pos, 0, 1.0);
+
+  
+  vUv = (pos + 1.0) / 2.0;
+  uv = vec2(vUv.x, 1.0 - vUv.y);
 
   gl_Position = position;
 }
@@ -62,18 +39,16 @@ precision highp float;
 uniform float progress;
 uniform sampler2D texture1;
 uniform sampler2D texture2;
+uniform vec2 size1;
+uniform vec2 size2;
 
 varying vec2 vUv;
 varying vec2 uv;
-varying vec2 uv1;
-varying vec2 uv2;
-varying vec2 size1;
-varying vec2 size2;
 varying vec4 position;
 
 varying vec2 resolution;
 
-vec2 fittedUv(vec2 imageSize, vec2 uv, vec2 resolution) {
+vec2 getUv(vec2 imageSize, vec2 uv) {
     float tR = imageSize.x / imageSize.y;
     float vR = resolution.x / resolution.y;
 
@@ -86,7 +61,13 @@ vec2 fittedUv(vec2 imageSize, vec2 uv, vec2 resolution) {
     }
 }
 
+vec2 getUv1(vec2 uv) {
+    return getUv(size1, uv);
+}
 
+vec2 getUv2(vec2 uv) {
+    return getUv(size2, uv);
+}
 `;
 
 export class ShaderTransition {
@@ -252,7 +233,7 @@ export class ShaderTransition {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.texture1.texture);
 
-        const size1L = gl.getUniformLocation(this.program, 'tSize1');
+        const size1L = gl.getUniformLocation(this.program, 'size1');
         gl.uniform2f(size1L, this.texture1.width, this.texture1.height);
 
         const texture2L = gl.getUniformLocation(this.program, 'texture2');
@@ -260,7 +241,7 @@ export class ShaderTransition {
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, this.texture2.texture);
 
-        const size2L = gl.getUniformLocation(this.program, 'tSize2');
+        const size2L = gl.getUniformLocation(this.program, 'size2');
         gl.uniform2f(size2L, this.texture2.width, this.texture2.height);
 
         const resolutionL = gl.getUniformLocation(this.program, 'res');

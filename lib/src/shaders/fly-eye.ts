@@ -10,11 +10,11 @@ void main()	{
         cos(zoom*uv.x),
         sin(zoom*uv.y)
     );
-    vec4 texTo = texture2D(texture2, fittedUv(size2, uv + inv*disp, resolution));
+    vec4 texTo = texture2D(texture2, getUv2(uv + inv*disp));
     vec4 texFrom = vec4(
-        texture2D(texture1, fittedUv(size1, uv + progress*disp*(1.0 - colorSeparation), resolution)).r,
-        texture2D(texture1, fittedUv(size1, uv + progress*disp, resolution)).g,
-        texture2D(texture1, fittedUv(size1, uv + progress*disp*(1.0 + colorSeparation), resolution)).b,
+        texture2D(texture1, getUv1(uv + progress*disp*(1.0 - colorSeparation))).r,
+        texture2D(texture1, getUv1(uv + progress*disp)).g,
+        texture2D(texture1, getUv1(uv + progress*disp*(1.0 + colorSeparation))).b,
         1.0
     );
     gl_FragColor = texTo * progress + texFrom*inv;

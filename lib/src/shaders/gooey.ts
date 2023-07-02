@@ -1,15 +1,3 @@
-export const vertex = `
-attribute vec2 position;
-varying vec2 vUv;
-varying vec4 vPosition;
-
-void main() {
-  vUv = (position + 1.0) / 2.0;
-  vPosition = vec4(position, 0, 1.0);
-  gl_Position = vPosition;
-}
-`;
-
 export const fragment = `
 
 const float width = 0.5;
@@ -165,8 +153,8 @@ void main()	{
     float dt = parabola(progress, 1.0);
 
 
-    vec4 img1 = texture2D(texture1, uv1);
-    vec4 img2 = texture2D(texture2, uv2);
+    vec4 img1 = texture2D(texture1, getUv1(uv));
+    vec4 img2 = texture2D(texture2, getUv2(uv));
 
     float realnoise = 0.5*(
         cnoise(
