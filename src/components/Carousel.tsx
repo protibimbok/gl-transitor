@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { classNames } from '../utils/ui';
 import { ShaderTransitionArray } from '../../lib/src/main';
+import all from '../../lib/src/shaders/index';
 
 interface CarouselProps {
     slides: {
@@ -17,8 +18,12 @@ export default function Carousel({ slides }: CarouselProps) {
 
     useEffect(() => {
         if (canvas.current) {
-            //@ts-expect-error why?
-            slider.current = ShaderTransitionArray.init(canvas.current, canvas.current.nextElementSibling?.querySelectorAll('img'));
+            slider.current = ShaderTransitionArray.init(
+                canvas.current,
+                all,
+                //@ts-expect-error why?
+                canvas.current.nextElementSibling?.querySelectorAll('img')
+            );
         }
         return () => {
             if (slider.current) {

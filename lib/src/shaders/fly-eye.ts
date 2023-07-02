@@ -1,4 +1,4 @@
-export const fragment = `
+export default `
 float size = 0.04;
 float zoom = 50.0;
 float colorSeparation = 0.3;

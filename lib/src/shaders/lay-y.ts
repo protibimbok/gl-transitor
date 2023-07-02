@@ -1,4 +1,4 @@
-export const fragment = `
+export default `
 void main()	{
     vec2 p = uv;
     float x = progress;

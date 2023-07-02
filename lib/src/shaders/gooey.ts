@@ -1,4 +1,4 @@
-export const fragment = `
+export default `
 
 const float width = 0.5;
 const float scaleX = 40.0;
