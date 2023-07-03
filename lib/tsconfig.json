@@ -11,6 +11,6 @@
     },
     "include": [
         "./src/main.ts",
-        "./src/shaders"
+        "./src/effects"
     ],
 }

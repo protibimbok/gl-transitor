@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { classNames } from '../utils/ui';
-import { ShaderTransitionArray } from '../../lib/src/main';
-import all from '../../lib/src/shaders/index';
+import { GLTransitorArray } from '../../lib/src/main';
+import { GLTransitorEffects } from '../../lib/src/effects/index';
 
 interface CarouselProps {
     slides: {
@@ -13,14 +13,14 @@ interface CarouselProps {
 
 export default function Carousel({ slides }: CarouselProps) {
     const [active, setActive] = useState(0);
-    const slider = useRef<ShaderTransitionArray>();
+    const slider = useRef<GLTransitorArray>();
     const canvas = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
         if (canvas.current) {
-            slider.current = ShaderTransitionArray.withImages(
+            slider.current = GLTransitorArray.withImages(
                 canvas.current,
-                all,
+                GLTransitorEffects,
                 //@ts-expect-error why?
                 canvas.current.nextElementSibling?.querySelectorAll('img')
             );

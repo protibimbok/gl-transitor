@@ -7,6 +7,13 @@ interface TextureInfo {
     width: number;
 }
 
+type AnimateArg =
+    | string
+    | HTMLImageElement
+    | {
+          url: string;
+      };
+
 const vertex = `
 precision highp float;
 
@@ -69,11 +76,11 @@ vec2 getUv2(vec2 uv) {
 }
 `;
 
-export class ShaderTransition {
+export class GLTransitor {
     protected TEXTURE_CACHE = new Map<string, WebGLTexture>();
 
     protected gl: WebGLRenderingContext;
-    protected program?: WebGLProgram;
+    protected program: WebGLProgram;
 
     protected canvas: HTMLCanvasElement;
 
@@ -97,7 +104,7 @@ export class ShaderTransition {
 
         if (!canvas || canvas.tagName !== 'CANVAS') {
             throw new Error(
-                "[shader-animation]: 'canvas' argument does not point to an <canvas> element!"
+                "[gl-transitor]: 'canvas' argument does not point to an <canvas> element!"
             );
         }
         this.canvas = canvas;
@@ -106,7 +113,7 @@ export class ShaderTransition {
         if (typeof effects === 'string') {
             effects = [effects];
         } else if (effects.length === 0) {
-            throw new Error('[shader-animation]: No effect is registered!');
+            throw new Error('[gl-transitor]: No effect is registered!');
         }
 
         this.programs = Array(effects.length);
@@ -122,11 +129,16 @@ export class ShaderTransition {
     public static init(
         canvas: string | HTMLCanvasElement,
         effects: string | string[]
-    ): ShaderTransition {
-        return new ShaderTransition(canvas, effects);
+    ): GLTransitor {
+        return new GLTransitor(canvas, effects);
     }
 
-    public animate(from: TextureInfo, to: TextureInfo) {
+    public animate(from: AnimateArg, to: AnimateArg) {
+        //TODO: Implement this method;
+        throw new Error('Not implemented yet!');
+    }
+
+    public animateTexture(from: TextureInfo, to: TextureInfo) {
         if (this.programs.length > 1) {
             // console.time('Finding Program:');
             this.currentProgram = Math.floor(
@@ -164,24 +176,48 @@ export class ShaderTransition {
         });
     }
 
-    public stop(): ShaderTransition {
+    public stop(): GLTransitor {
         this.stopFrame = true;
         return this;
     }
 
-    public setDuration(duration: number): ShaderTransition {
+    public setDuration(duration: number): GLTransitor {
         this.DURATION = duration;
         return this;
     }
 
-    public setReverse(reverse: boolean): ShaderTransition {
+    public setReverse(reverse: boolean): GLTransitor {
         this.REVERSE = reverse;
         return this;
     }
 
+    public createTexture(image: HTMLImageElement): TextureInfo {
+        const gl = this.gl;
+        const texture = gl.createTexture() as WebGLTexture;
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            image
+        );
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+        return {
+            texture,
+            height: image.naturalHeight,
+            width: image.naturalWidth,
+        };
+    }
+
     protected initProgram(fragment: string): WebGLProgram {
         if (!this.gl) {
-            throw new Error('[shader-animation]: No canvas is provided!');
+            throw new Error('[gl-transitor]: No canvas is provided!');
         }
         const gl = this.gl;
         const vertexBuffer = gl.createBuffer();
@@ -196,7 +232,7 @@ export class ShaderTransition {
 
         if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
             throw new Error(
-                '[shader-animation]: Vertex Shader compilation error:\n' +
+                '[gl-transitor]: Vertex Shader compilation error:\n' +
                     gl.getShaderInfoLog(vertexShader)
             );
         }
@@ -209,7 +245,7 @@ export class ShaderTransition {
 
         if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
             throw new Error(
-                '[shader-animation]: Fragment Shader compilation error:\n' +
+                '[gl-transitor]: Fragment Shader compilation error:\n' +
                     gl.getShaderInfoLog(fragmentShader)
             );
         }
@@ -221,7 +257,7 @@ export class ShaderTransition {
 
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             throw new Error(
-                '[shader-animation]: Program error:\n' +
+                '[gl-transitor]: Program error:\n' +
                     gl.getProgramInfoLog(program)
             );
         }
@@ -231,10 +267,6 @@ export class ShaderTransition {
 
     protected updateUniforms(from: TextureInfo, to: TextureInfo) {
         // console.time('Uniforms:');
-        if (!this.program) {
-            throw new Error('[shader-animation]: No program is set!');
-        }
-
         const gl = this.gl;
 
         gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -277,33 +309,9 @@ export class ShaderTransition {
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
-
-    protected imageToTexture(image: HTMLImageElement): TextureInfo {
-        const gl = this.gl;
-        const texture = gl.createTexture() as WebGLTexture;
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(
-            gl.TEXTURE_2D,
-            0,
-            gl.RGBA,
-            gl.RGBA,
-            gl.UNSIGNED_BYTE,
-            image
-        );
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-        return {
-            texture,
-            height: image.naturalHeight,
-            width: image.naturalWidth,
-        };
-    }
 }
 
-export class ShaderTransitionArray extends ShaderTransition {
+export class GLTransitorArray extends GLTransitor {
     protected textures: TextureInfo[] = [];
 
     protected active = 0;
@@ -314,13 +322,13 @@ export class ShaderTransitionArray extends ShaderTransition {
         canvas: string | HTMLCanvasElement,
         effects: string | string[],
         images: HTMLImageElement[]
-    ): ShaderTransitionArray {
-        const ins = new ShaderTransitionArray(canvas, effects);
+    ): GLTransitorArray {
+        const ins = new GLTransitorArray(canvas, effects);
         ins.setImages(images);
         return ins;
     }
 
-    public setImages(images: HTMLImageElement[]): ShaderTransitionArray {
+    public setImages(images: HTMLImageElement[]): GLTransitorArray {
         this.textures = Array(images.length);
         const rect = this.canvas.getBoundingClientRect();
         this.canvas.height = rect.height;
@@ -331,7 +339,7 @@ export class ShaderTransitionArray extends ShaderTransition {
                 if (this.disposed) {
                     return;
                 }
-                const texture = (this.textures[i] = this.imageToTexture(img));
+                const texture = (this.textures[i] = this.createTexture(img));
                 if (i === 0) {
                     this.stop();
                     this.updateUniforms(texture, texture);
@@ -354,7 +362,8 @@ export class ShaderTransitionArray extends ShaderTransition {
         if (this.active < 0) {
             this.active += this.textures.length;
         }
-        await this.setReverse(old > to).animate(
+        this.setReverse(old > to);
+        await this.animateTexture(
             this.textures[old],
             this.textures[this.active]
         );
