@@ -3,7 +3,7 @@ import Carousel from './components/Carousel';
 const IMAGES = Array(8)
     .fill(0)
     .map((_, i) => ({
-        image: `/images/image-${i + 1}.jpg`,
+        image: `${import.meta.env.BASE_URL}images/image-${i + 1}.jpg`,
     }));
 
 function App() {
