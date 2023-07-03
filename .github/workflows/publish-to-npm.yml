@@ -23,7 +23,7 @@ jobs:
       - name: Build and Publish
         working-directory: lib
         run: |
-          cp ../LICENCE.md ./LICENCE.md
+          cp ../LICENSE.md ./LICENSE.md
           cp ../README.md ./README.md
           pnpm install
           pnpm build
