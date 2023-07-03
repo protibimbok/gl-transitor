@@ -133,7 +133,7 @@ export class GLTransitor {
         return new GLTransitor(canvas, effects);
     }
 
-    public animate(from: AnimateArg, to: AnimateArg) {
+    public animate(_from: AnimateArg, _to: AnimateArg) {
         //TODO: Implement this method;
         throw new Error('Not implemented yet!');
     }
